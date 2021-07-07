@@ -1,3 +1,8 @@
+# User defined
+Datasets/
+Models/WRSNT_28_10/variables/
+
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
