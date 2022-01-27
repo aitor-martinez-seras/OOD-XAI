@@ -430,27 +430,25 @@ def tp_fn_fp_tn_computation(in_or_out_distribution_per_tpr):
 
 
 
-
+# Next three functions used to download from Gdrive
 def download_file_from_google_drive(id, destination):
     URL = "https://docs.google.com/uc?export=download"
-
     session = requests.Session()
-
     response = session.get(URL, params = { 'id' : id }, stream = True)
     token = get_confirm_token(response)
-
     if token:
         params = { 'id' : id, 'confirm' : token }
         response = session.get(URL, params = params, stream = True)
-
     save_response_content(response, destination)
+    return destination
+
 
 def get_confirm_token(response):
     for key, value in response.cookies.items():
         if key.startswith('download_warning'):
             return value
-
     return None
+
 
 def save_response_content(response, destination):
     CHUNK_SIZE = 32768
@@ -459,29 +457,6 @@ def save_response_content(response, destination):
         for chunk in response.iter_content(CHUNK_SIZE):
             if chunk: # filter out keep-alive new chunks
                 f.write(chunk)
-
-if __name__ == "__main__":
-    file_id = 'TAKE ID FROM SHAREABLE LINK'
-    destination = 'DESTINATION FILE ON YOUR DISK'
-    download_file_from_google_drive(file_id, destination)
-
-
-def download_SVHN():
-  '''
-  Function that downloads the SVHN Cropped dataset
-  '''
-  !cd /content/
-  !wget --load-cookies /tmp/cookies.txt "https://docs.google.com/uc?export=download&confirm=$(wget --quiet --save-cookies /tmp/cookies.txt --keep-session-cookies --no-check-certificate 'https://docs.google.com/uc?export=download&id=1Qezu-SHyjBF_fGwdFYUSioVbAu3GMfBj' -O- | sed -rn 's/.*confirm=([0-9A-Za-z_]+).*/\1\n/p')&id=1Qezu-SHyjBF_fGwdFYUSioVbAu3GMfBj" -O SVHN_Cropped.zip && rm -rf /tmp/cookies.txt
-  return '/content/SVHN_Cropped.zip'
-
-
-def download_weights_and_model():
-  '''
-  Function that downloads the weights and the ResNet32v1 model from Google Drive
-  '''
-  %cd /content/
-  !wget --no-check-certificate 'https://docs.google.com/uc?export=download&id=1kubVcEv8ORheY0_3NuGb7VwE8OMbX5G9' -O OoD_xAI.zip
-  return '/content/OoD_xAI.zip'
 
 
 def unzip_file(zip_file_path):
@@ -492,8 +467,8 @@ def unzip_file(zip_file_path):
   with ZipFile(zip_file_path, 'r') as zipObj:
     # Extract all the contents of zip file in current directory
     zipObj.extractall()
-  !rm -r $zip_file_path
-  return zip_file_path[:-4]
+  os.remove(zip_file_path)
+  return zip_file_path[:-4] # The path of the new dir created
 
 
 def load_svhn(image_dir, image_file):
