@@ -3,6 +3,7 @@ Copia de OOD_Explainable_AI.ipynb
 datasets/
 prueba.py
 resnet32/
+pretrained_weights/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
