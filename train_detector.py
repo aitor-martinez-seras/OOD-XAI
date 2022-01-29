@@ -1,3 +1,4 @@
+import keras
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -28,4 +29,14 @@ from scipy.io import loadmat
 from scipy.cluster.hierarchy import dendrogram
 # Import created functions
 #from utils import *
+
+
+def train_od_detector(train_images_and_labels:tuple, model:keras.Model):
+    '''
+    Computes the training of the Out-of-Distribution detector by creating a clusterized space by using SSIM Distance
+    :param dataset_name: str of the In-Distribution dataset name
+    :param model: model instance already trained
+    :return: saves the arrays in the objects directory
+    '''
+    train_images, train_labels = train_images_and_labels
 

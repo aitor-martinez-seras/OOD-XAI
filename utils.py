@@ -27,6 +27,7 @@ from scipy.optimize import minimize_scalar
 from scipy.io import loadmat
 from scipy.cluster.hierarchy import dendrogram
 
+
 def grad_cam_plus(img, model, layer_name, label_name=None, category_id=None):
     """Get a heatmap by Grad-CAM.
     Args:
@@ -429,7 +430,6 @@ def tp_fn_fp_tn_computation(in_or_out_distribution_per_tpr):
     return tp_fn_fp_tn
 
 
-
 # Next three functions used to download from Gdrive
 def download_file_from_google_drive(id, destination):
     URL = "https://docs.google.com/uc?export=download"
@@ -459,14 +459,15 @@ def save_response_content(response, destination):
                 f.write(chunk)
 
 
-def unzip_file(zip_file_path):
+def unzip_file(zip_file_path: str, dest_dir: str):
   '''
-  Function that extracts the zip file and deletes it, returnin the new file path
+  Function that extracts the zip file and deletes it, returning the new file path
+  :param zip_file_path: str with the desired name for the zip file downloaded
   '''
   # Create a ZipFile Object and load sample.zip in it
   with ZipFile(zip_file_path, 'r') as zipObj:
     # Extract all the contents of zip file in current directory
-    zipObj.extractall()
+    zipObj.extractall(dest_dir)
   os.remove(zip_file_path)
   return zip_file_path[:-4] # The path of the new dir created
 
@@ -480,6 +481,129 @@ def load_svhn(image_dir, image_file):
   labels[np.where(labels==10)] = 0
   labels = to_categorical(labels)
   return images, labels
+
+
+def download_or_load_dataset(dataset_name: str, dataset_dir: str, return_train=True):
+    '''
+    Downloads the dataset, or loads it if already exist locally
+    :param dataset_name: str containing the name of the dataset
+    :param dataset_dir: str containing the directory to place the SVHN dataset
+    :param return_train: if True, returns the train split of the dataset
+    :return: if return_train=True, then (train_images, train_labels), (test_images, test_labels), class_names,
+    num_classes; else (test_images, test_labels)
+    '''
+    print('Only SVHN_Cropped is downloaded directly to the datasets folder, the other datasets are stored'
+          'locally in ~/.keras/datasets')
+    try:
+        if os.path.isdir(dataset_dir):
+            pass
+        else:
+            os.mkdir(dataset_dir)
+            print(f'The directory {dataset_dir} has been created')
+    except Exception as e:
+        print(f'Exception {e.__class__} occurred while creating the {dataset_dir} directory')
+    if dataset_name == 'MNIST':
+        # Load the dataset
+        (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.mnist.load_data()
+        # Reduce the range of the images to [0,1]
+        train_images = train_images / 255
+        test_images = test_images / 255
+        # Format images
+        train_images = train_images.reshape(60000, 28, 28, 1)
+        train_images = train_images.astype('float32')
+        test_images = test_images.reshape(10000, 28, 28, 1)
+        test_images = test_images.astype('float32')
+        # Labels to categorical (10 dimensions with a 1 in the correspondent class)
+        train_labels = to_categorical(train_labels)
+        test_labels = to_categorical(test_labels)
+        # Definition of the constants of the dataset
+        class_names = list(np.linspace(0, 9, 10).astype('int'))
+        class_names = [str(i) for i in class_names]
+    elif dataset_name == 'Fashion_MNIST':
+        # Load F_MNIST dataset
+        fashion_mnist = tf.keras.datasets.fashion_mnist
+        (train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
+        # Reduce the range of the images to [0,1]
+        train_images = train_images / 255
+        test_images = test_images / 255
+        # Format images
+        train_images = train_images.reshape(60000, 28, 28, 1)
+        train_images = train_images.astype('float32')
+        test_images = test_images.reshape(10000, 28, 28, 1)
+        test_images = test_images.astype('float32')
+        # Labels to categorical (10 dimensions with a 1 in the correspondent class)
+        train_labels = to_categorical(train_labels)
+        test_labels = to_categorical(test_labels)
+        # Definition of the constants of the dataset
+        class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal',
+                       'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
+    elif dataset_name == 'Cifar10':
+        cifar = tf.keras.datasets.cifar10
+        (train_images, train_labels_clases), (test_images, test_labels_clases) = cifar.load_data()
+        # Format images
+        train_images = train_images.reshape(50000, 32, 32, 3)
+        train_images = train_images.astype('float32') / 255
+        test_images = test_images.reshape(10000, 32, 32, 3)
+        test_images = test_images.astype('float32') / 255
+        # Labels to categorical (10 dimensions with a 1 in the correspondent class)
+        train_labels = to_categorical(train_labels_clases)
+        test_labels = to_categorical(test_labels_clases)
+        # Definition of the constants of the dataset
+        class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
+                       'dog', 'frog', 'horse', 'ship', 'truck']
+    elif dataset_name == 'SVHN_Cropped':
+        # Download SVHN
+        SVHN_ID = '1Qezu-SHyjBF_fGwdFYUSioVbAu3GMfBj'
+        SVHN_ZIP_FILE_NAME = 'SVHN_Cropped.zip'
+        svhn_zip_path = os.path.join(dataset_dir, SVHN_ZIP_FILE_NAME)
+        svhn_dir_path = unzip_file(download_file_from_google_drive(SVHN_ID, svhn_zip_path), dest_dir=dataset_dir)
+        # Load SVHN
+        train_images, train_labels = load_svhn(svhn_dir_path, 'train_32x32.mat')
+        test_images, test_labels = load_svhn(svhn_dir_path, 'test_32x32.mat')
+        # Definition of the constants of the dataset
+        class_names = list(np.linspace(0, 9, 10).astype('int'))
+        class_names = [str(i) for i in class_names]
+    else:
+        raise NameError('Dataset name not found in the dataset options')
+
+    if return_train is True:
+        num_classes = len(class_names)
+        return (train_images, train_labels), (test_images, test_labels), class_names, num_classes
+    else:
+        return test_images, test_labels
+
+
+def load_model_weights(model: keras.Model, dataset_name: str, model_name: str, weights_dir: str):
+    '''
+    Loads the weights for the specified model
+    :return:
+    '''
+    download_models_weights(weights_dir)
+    pretrained_weights_path = os.path.join(weights_dir, f'{dataset_name}_{model_name}.h5')
+    model.load_weights(pretrained_weights_path)
+
+
+def download_models_weights(weights_dir_path):
+    '''
+    Downloads the pretrained weights for the models
+    :return:
+    '''
+    PRETRAINED_WEIGHTS_ID = '1DZXCm839Ht0Xcl4w-ynUepjRoxRp7xsr'
+    PRETRAINED_WEIGHTS_ZIP_FILE_NAME = 'pretrained_weights.zip'
+    weights_zip_path = os.path.join(weights_dir_path, PRETRAINED_WEIGHTS_ZIP_FILE_NAME)
+    try:
+        if os.path.isdir(weights_dir_path):
+            print(f'{weights_dir_path} directory already exist, delete if to automatically download again the files')
+
+        else:
+            os.mkdir(weights_dir_path)
+            print(f'Folder "{weights_dir_path}" created')
+            weights_dir_path = unzip_file(download_file_from_google_drive(PRETRAINED_WEIGHTS_ID,
+                                                                          weights_zip_path), dest_dir=weights_dir_path)
+            print(f'Succesfully downloaded the {weights_dir_path} directory')
+
+    except Exception as e:
+        print(f'Exception {e.__class__} occurred while creating downloading')
 
 
 def load_test_sample_of_dataset(dataset_name):

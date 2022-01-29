@@ -1,3 +1,4 @@
+import keras
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -28,92 +29,7 @@ from scipy.io import loadmat
 from scipy.cluster.hierarchy import dendrogram
 # Import created functions
 from utils import *
-
-
-def download_or_load_dataset(dataset_name:str, return_train=True):
-    '''
-    Dowloads the dataset
-    :param dataset_name: str containing the name of the dataset
-    :param return_train: if True, returns the train split of the dataset
-    :return:
-    '''
-    print('Only SVHN_Cropped is downloaded directly to the datasets folder, the other datasets are stored'
-          'locally in ~/.keras/datasets')
-    try:
-        if os.path.isdir(DATASET_DIR):
-            pass
-        else:
-            os.mkdir(DATASET_DIR)
-            print(f'The directory {DATASET_DIR} has been created')
-    except Exception as e:
-        print(f'Exception {e.__class__} occurred while creating the {DATASET_DIR} directory')
-    if dataset_name == 'MNIST':
-        # Load the dataset
-        (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.mnist.load_data()
-        # Reduce the range of the images to [0,1]
-        train_images = train_images / 255
-        test_images = test_images / 255
-        # Format images
-        train_images = train_images.reshape(60000, 28, 28, 1)
-        train_images = train_images.astype('float32')
-        test_images = test_images.reshape(10000, 28, 28, 1)
-        test_images = test_images.astype('float32')
-        # Labels to categorical (10 dimensions with a 1 in the correspondent class)
-        train_labels = to_categorical(train_labels)
-        test_labels = to_categorical(test_labels)
-        # Definition of the constants of the dataset
-        class_names = list(np.linspace(0, 9, 10).astype('int'))
-        class_names = [str(i) for i in class_names]
-    elif dataset_name == 'Fashion_MNIST':
-        # Load F_MNIST dataset
-        fashion_mnist = tf.keras.datasets.fashion_mnist
-        (train_images, train_labels), (test_images, test_labels) = fashion_mnist.load_data()
-        # Reduce the range of the images to [0,1]
-        train_images = train_images / 255
-        test_images = test_images / 255
-        # Format images
-        train_images = train_images.reshape(60000, 28, 28, 1)
-        train_images = train_images.astype('float32')
-        test_images = test_images.reshape(10000, 28, 28, 1)
-        test_images = test_images.astype('float32')
-        # Labels to categorical (10 dimensions with a 1 in the correspondent class)
-        train_labels = to_categorical(train_labels)
-        test_labels = to_categorical(test_labels)
-        # Definition of the constants of the dataset
-        class_names = ['T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat', 'Sandal',
-                       'Shirt', 'Sneaker', 'Bag', 'Ankle boot']
-    elif dataset_name == 'Cifar10':
-        cifar = tf.keras.datasets.cifar10
-        (train_images, train_labels_clases), (test_images, test_labels_clases) = cifar.load_data()
-        # Format images
-        train_images = train_images.reshape(50000, 32, 32, 3)
-        train_images = train_images.astype('float32') / 255
-        test_images = test_images.reshape(10000, 32, 32, 3)
-        test_images = test_images.astype('float32') / 255
-        # Labels to categorical (10 dimensions with a 1 in the correspondent class)
-        train_labels = to_categorical(train_labels_clases)
-        test_labels = to_categorical(test_labels_clases)
-        # Definition of the constants of the dataset
-        class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
-                       'dog', 'frog', 'horse', 'ship', 'truck']
-    elif dataset_name == 'SVHN_Cropped':
-        # Download SVHN
-        SVHN_ZIP_PATH = os.path.join(DATASET_DIR, SVHN_ZIP_FILE_NAME)
-        SVHN_DIR_PATH = unzip_file(download_file_from_google_drive(SVHN_ID,SVHN_ZIP_PATH))
-        # Load SVHN
-        train_images, train_labels = load_svhn(SVHN_DIR_PATH, 'train_32x32.mat')
-        test_images, test_labels = load_svhn(SVHN_DIR_PATH, 'test_32x32.mat')
-        # Definition of the constants of the dataset
-        class_names = list(np.linspace(0, 9, 10).astype('int'))
-        class_names = [str(i) for i in class_names]
-    else:
-        raise NameError('Dataset name not found in the dataset options')
-
-    if return_train is True:
-        num_classes = len(class_names)
-        return (train_images, train_labels), (test_images, test_labels), class_names, num_classes
-    else:
-        return test_images, test_labels
+from models import create_model
 
 
 def transform_to_MNIST_format():
@@ -123,30 +39,57 @@ def transform_to_MNIST_format():
     '''
 
 
-def load_model_weigths():
+def transform_to_Cifar10_like():
+    '''
+    Transforms a given gray dataset to Cifar10 format (32x32x3)
+    :return:
+    '''
+
+
 
 
 def main():
     # Parse the arguments of the call
     parser = argparse.ArgumentParser(description='Script that trains the detector on a specific ')
-    parser.add_argument('-i', '--ind', type=str, help='in distribution dataset',
-                        choices=['MNIST', 'Fashion_MNIST', 'Cifar10'], required=True)
-    parser.add_argument('-o', '--ood', type=str, help='out of distribution dataset',
-                        choices=['MNIST', 'Fashion_MNIST', 'Cifar10', 'SVHN_Cropped'], required=True)
+    parser.add_argument('-r_a', '--run_all', help='If used, it runs all the test of the paper', required=False)
+    parser.add_argument('-i', '--ind', type=str, help='in distribution dataset', nargs='+',
+                        choices=['MNIST', 'Fashion_MNIST', 'Cifar10'], required=False)
+    parser.add_argument('-o', '--ood', type=str, help='out of distribution dataset', nargs='+',
+                        choices=['MNIST', 'Fashion_MNIST', 'Cifar10', 'SVHN_Cropped'], required=False)
     parser.add_argument('-m', '--model_arch', type=str, choices=['LeNet', 'ResNet32'],
                         help='model architecture', required=True)
-    args = vars(parser.parse_args())
+    parser.add_argument('-avg', '--average_mode', type=str, nargs='+',
+                        help='average modes to be computed: Posible choices are Mean, Median or '
+                             'an integer represeting the percentage', required=False)
+    parser.add_argument('-ap', '--approach', type=str, choices=['g_r', 'g_all'], nargs='+',
+                        help='approaches to be computed', required=False)
+    #args = vars(parser.parse_args())
+    args = {'ind': 'Cifar10',
+            'ood': 'SVHN_Cropped',
+            'model_arch': 'ResNet32',
+            'average_mode': 'Mean',
+            'approach': 'g_r'}
+    # Visualize the arguments introduced
     print(args)
+    # TOODO LO SIGUIENTE VA DENTRO DEL BLUCLE
+    # Download the datasets
+    (train_images, train_labels), (test_images, test_labels), class_names, num_classes = download_or_load_dataset(
+        args['ind'], DATASET_DIR)
+    print(class_names)
+    # Create model
+    model = create_model(args['model_arch'])
+    # Load weights
+    load_model_weights(model, dataset_name=args['ind'], model_name=args['model_arch'], weights_dir=PRETRAINED_WEIGHTS_DIR)
+    metrics = model.evaluate(test_images, test_labels)
+    print('Accuracy obtained is', str(round(metrics[1] * 100, 2)) + '%')
+    # For every In-Distribution dataset, it has to run
+    #for in_dataset in args['ind']:
+        #train_od_detector()
 
 
 if __name__ == '__main__':
     # Constants definition
-    DATASET_DIR = 'datasets'
-    PRETRAINED_WEIGHTS_ID = '1kubVcEv8ORheY0_3NuGb7VwE8OMbX5G9'
-    PRETRAINED_WEIGHTS_DIR = 'pretrained_weigths'
-    PRETRAINED_WEIGHTS_ZIP_FILE_NAME = 'OoD_xAI.zip'
-    SVHN_ID = '1Qezu-SHyjBF_fGwdFYUSioVbAu3GMfBj'
-    SVHN_ZIP_FILE_NAME = 'SVHN_Cropped.zip'
-
+    DATASET_DIR = 'datasets/'
+    PRETRAINED_WEIGHTS_DIR = 'pretrained_weights/'
     # Run main code
     main()
