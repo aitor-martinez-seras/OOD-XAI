@@ -5,6 +5,7 @@ prueba.py
 resnet32/
 pretrained_weights/
 figures/
+objects/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
