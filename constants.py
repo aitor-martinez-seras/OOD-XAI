@@ -1,0 +1,9 @@
+# Constants definition
+DATASET_DIR = 'datasets/'
+SVHN_ID = '1Qezu-SHyjBF_fGwdFYUSioVbAu3GMfBj'
+SVHN_ZIP_FILE_NAME = 'SVHN_Cropped.zip'
+PRETRAINED_WEIGHTS_DIR = 'pretrained_weights/'
+PRETRAINED_WEIGHTS_ID = '1DZXCm839Ht0Xcl4w-ynUepjRoxRp7xsr'
+PRETRAINED_WEIGHTS_ZIP_FILE_NAME = 'pretrained_weights.zip'
+OBJECTS_DIR_NAME = 'objects/'
+FIGURES_DIR_NAME = 'figures/'

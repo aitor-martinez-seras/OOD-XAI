@@ -3,14 +3,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
-from tensorflow.keras import layers
 from tensorflow.keras.utils import to_categorical
 # Utils
 from tqdm import tqdm
-from sklearn.utils import shuffle
-# Clustering
-from sklearn.metrics import silhouette_score
-from sklearn.cluster import AgglomerativeClustering
 # Image processing and transformations
 from skimage.transform import resize
 from skimage.transform import rotate
@@ -20,12 +15,30 @@ from skimage import color
 # To handle files
 import os
 import requests
-import pickle
 from zipfile import ZipFile
 # Scipy funcitons
-from scipy.optimize import minimize_scalar
 from scipy.io import loadmat
 from scipy.cluster.hierarchy import dendrogram
+# Constants
+from constants import *
+
+# Constants
+DATA_RANGE = 2
+
+
+def create_dir(dir_name):
+    '''
+    Creates a directory making sure that it does not exist
+    :return:
+    '''
+    try:
+        if os.path.isdir(dir_name):
+            print(f'Directory "{dir_name}" already exist')
+        else:
+            os.mkdir(dir_name)
+        print(f'Successfully created "{dir_name}"')
+    except Exception as e:
+        print(f'Exception {e.__class__} occurred while creating the {dir_name} directory')
 
 
 def grad_cam_plus(img, model, layer_name, label_name=None, category_id=None):
@@ -198,18 +211,19 @@ def search_index_of_class(class_index, n_times, labels, ini=0):
   return indexes
 
 
-def creation_of_heatmaps_per_class(number_of_htmaps, instances, labels):
+def creation_of_heatmaps_per_class(number_of_htmaps, instances, labels, model, class_names: list):
     '''
     Creates an array with the number of heatmaps selected per class
     '''
-    heatmaps = np.empty((NUM_CLASSES, number_of_htmaps, model.get_layer(LAST_CONV_LAYER).output.shape[1],
-                         model.get_layer(LAST_CONV_LAYER).output.shape[2]))
-    for class_index in tqdm(range(NUM_CLASSES)):
+    last_conv_layer = extract_last_convolutional_layer_name(model)
+    heatmaps = np.empty((len(class_names), number_of_htmaps, model.get_layer(last_conv_layer).output.shape[1],
+                         model.get_layer(last_conv_layer).output.shape[2]))
+    for class_index in tqdm(range(len(class_names))):
         # List of index of the labels for the class
         indexes_for_one_class = search_index_of_class(class_index, number_of_htmaps, labels)
         for loop_index, label_index in enumerate(indexes_for_one_class):
             # Fill the array with the heatmaps
-            heatmaps[class_index, loop_index] = grad_cam_plus(instances[label_index], model, LAST_CONV_LAYER,
+            heatmaps[class_index, loop_index] = grad_cam_plus(instances[label_index], model, last_conv_layer,
                                                               category_id=np.argmax(labels[label_index]))
     return heatmaps
 
@@ -274,14 +288,27 @@ def compute_average_heatmaps_per_cluster(cluster_indexes, heatmaps_array, ssim_d
     return avg_htmaps_per_cluster
 
 
-def generate_heatmaps(images, preds):
+def extract_last_convolutional_layer_name(model) -> str:
+    """ Save the name of the last convolutional layer """
+    last_conv_layer = ''
+    for layer in model.layers[::-1]:
+        if isinstance(layer, (keras.layers.Conv2D, keras.layers.Add)):
+            last_conv_layer = layer.name
+            break
+    if last_conv_layer == '':
+        raise ValueError('No last convolutional layer encountered')
+    return last_conv_layer
+
+
+def generate_heatmaps(images, predictions, model):
     '''
     Generates the heatmaps of the images provided using the prediction (the label)
     '''
-    htmaps = np.zeros((images.shape[0], model.get_layer(LAST_CONV_LAYER).output.shape[1],
-                       model.get_layer(LAST_CONV_LAYER).output.shape[2]))
+    last_conv_layer = extract_last_convolutional_layer_name(model)
+    htmaps = np.zeros((images.shape[0], model.get_layer(last_conv_layer).output.shape[1],
+                       model.get_layer(last_conv_layer).output.shape[2]))
     for i, image in tqdm(enumerate(images)):
-        htmaps[i] = grad_cam_plus(image, model, LAST_CONV_LAYER, category_id=preds[i])
+        htmaps[i] = grad_cam_plus(image, model, last_conv_layer, category_id=predictions[i])
     return htmaps
 
 
@@ -306,6 +333,7 @@ def ssim_distance(img1,img2):
   Dssim = (1 - SSIM)/2
   This way, obtained value is between 0 and 1, 0 being distance between identical images
   '''
+  # Data range is from -1 to 1, therefore 2
   return (1-ssim(img1,img2, data_range=DATA_RANGE))/2
 
 
@@ -452,7 +480,6 @@ def get_confirm_token(response):
 
 def save_response_content(response, destination):
     CHUNK_SIZE = 32768
-
     with open(destination, "wb") as f:
         for chunk in response.iter_content(CHUNK_SIZE):
             if chunk: # filter out keep-alive new chunks
@@ -460,48 +487,46 @@ def save_response_content(response, destination):
 
 
 def unzip_file(zip_file_path: str, dest_dir: str):
-  '''
-  Function that extracts the zip file and deletes it, returning the new file path
-  :param zip_file_path: str with the desired name for the zip file downloaded
-  '''
-  # Create a ZipFile Object and load sample.zip in it
-  with ZipFile(zip_file_path, 'r') as zipObj:
-    # Extract all the contents of zip file in current directory
-    zipObj.extractall(dest_dir)
-  os.remove(zip_file_path)
-  return zip_file_path[:-4] # The path of the new dir created
+    '''
+    Function that extracts the zip file and deletes it, returning the new file path
+    :param zip_file_path: str with the desired name for the zip file downloaded
+    :param dest_dir:
+    '''
+    # Create a ZipFile Object and load sample.zip in it
+    with ZipFile(zip_file_path, 'r') as zipObj:
+      # Extract all the contents of zip file in current directory
+      zipObj.extractall(dest_dir)
+    os.remove(zip_file_path)
+    return zip_file_path[:-4] # The path of the new dir created
 
 
 def load_svhn(image_dir, image_file):
-  print ('Loading SVHN dataset.')
-  image_dir = os.path.join(image_dir, image_file)
-  svhn = loadmat(image_dir)
-  images = np.transpose(svhn['X'], [3, 0, 1, 2]).astype('float32')/255
-  labels = svhn['y']
-  labels[np.where(labels==10)] = 0
-  labels = to_categorical(labels)
-  return images, labels
+    '''
+
+    :param image_dir:
+    :param image_file:
+    :return:
+    '''
+    print ('Loading SVHN dataset.')
+    image_dir = os.path.join(image_dir, image_file)
+    svhn = loadmat(image_dir)
+    images = np.transpose(svhn['X'], [3, 0, 1, 2]).astype('float32')/255
+    labels = svhn['y']
+    labels[np.where(labels==10)] = 0
+    labels = to_categorical(labels)
+    return images, labels
 
 
-def download_or_load_dataset(dataset_name: str, dataset_dir: str, return_train=True):
+def download_or_load_dataset(dataset_name: str, return_train=True):
     '''
     Downloads the dataset, or loads it if already exist locally
     :param dataset_name: str containing the name of the dataset
-    :param dataset_dir: str containing the directory to place the SVHN dataset
     :param return_train: if True, returns the train split of the dataset
     :return: if return_train=True, then (train_images, train_labels), (test_images, test_labels), class_names,
     num_classes; else (test_images, test_labels)
     '''
     print('Only SVHN_Cropped is downloaded directly to the datasets folder, the other datasets are stored'
           'locally in ~/.keras/datasets')
-    try:
-        if os.path.isdir(dataset_dir):
-            pass
-        else:
-            os.mkdir(dataset_dir)
-            print(f'The directory {dataset_dir} has been created')
-    except Exception as e:
-        print(f'Exception {e.__class__} occurred while creating the {dataset_dir} directory')
     if dataset_name == 'MNIST':
         # Load the dataset
         (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.mnist.load_data()
@@ -552,11 +577,11 @@ def download_or_load_dataset(dataset_name: str, dataset_dir: str, return_train=T
         class_names = ['airplane', 'automobile', 'bird', 'cat', 'deer',
                        'dog', 'frog', 'horse', 'ship', 'truck']
     elif dataset_name == 'SVHN_Cropped':
+        # Create datasets dir if it does not exist
+        create_dir(DATASET_DIR)
         # Download SVHN
-        SVHN_ID = '1Qezu-SHyjBF_fGwdFYUSioVbAu3GMfBj'
-        SVHN_ZIP_FILE_NAME = 'SVHN_Cropped.zip'
-        svhn_zip_path = os.path.join(dataset_dir, SVHN_ZIP_FILE_NAME)
-        svhn_dir_path = unzip_file(download_file_from_google_drive(SVHN_ID, svhn_zip_path), dest_dir=dataset_dir)
+        svhn_zip_path = os.path.join(DATASET_DIR, SVHN_ZIP_FILE_NAME)
+        svhn_dir_path = unzip_file(download_file_from_google_drive(SVHN_ID, svhn_zip_path), dest_dir=DATASET_DIR)
         # Load SVHN
         train_images, train_labels = load_svhn(svhn_dir_path, 'train_32x32.mat')
         test_images, test_labels = load_svhn(svhn_dir_path, 'test_32x32.mat')
@@ -569,17 +594,19 @@ def download_or_load_dataset(dataset_name: str, dataset_dir: str, return_train=T
     if return_train is True:
         num_classes = len(class_names)
         return (train_images, train_labels), (test_images, test_labels), class_names, num_classes
-    else:
+    elif return_train is False:
         return test_images, test_labels
+    else:
+        raise NameError('Wrong option for the return_train parameter')
 
 
-def load_model_weights(model: keras.Model, dataset_name: str, model_name: str, weights_dir: str):
+def load_model_weights(model: keras.Model, dataset_name: str, model_name: str):
     '''
     Loads the weights for the specified model
     :return:
     '''
-    download_models_weights(weights_dir)
-    pretrained_weights_path = os.path.join(weights_dir, f'{dataset_name}_{model_name}.h5')
+    download_models_weights(PRETRAINED_WEIGHTS_DIR)
+    pretrained_weights_path = os.path.join(PRETRAINED_WEIGHTS_DIR, f'{dataset_name}_{model_name}.h5')
     model.load_weights(pretrained_weights_path)
 
 
@@ -588,20 +615,16 @@ def download_models_weights(weights_dir_path):
     Downloads the pretrained weights for the models
     :return:
     '''
-    PRETRAINED_WEIGHTS_ID = '1DZXCm839Ht0Xcl4w-ynUepjRoxRp7xsr'
-    PRETRAINED_WEIGHTS_ZIP_FILE_NAME = 'pretrained_weights.zip'
     weights_zip_path = os.path.join(weights_dir_path, PRETRAINED_WEIGHTS_ZIP_FILE_NAME)
     try:
         if os.path.isdir(weights_dir_path):
             print(f'{weights_dir_path} directory already exist, delete if to automatically download again the files')
-
         else:
             os.mkdir(weights_dir_path)
             print(f'Folder "{weights_dir_path}" created')
             weights_dir_path = unzip_file(download_file_from_google_drive(PRETRAINED_WEIGHTS_ID,
                                                                           weights_zip_path), dest_dir=weights_dir_path)
-            print(f'Succesfully downloaded the {weights_dir_path} directory')
-
+            print(f'Successfully downloaded the {weights_dir_path} directory')
     except Exception as e:
         print(f'Exception {e.__class__} occurred while creating downloading')
 
