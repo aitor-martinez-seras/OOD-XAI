@@ -517,7 +517,7 @@ def load_svhn(image_dir, image_file):
     return images, labels
 
 
-def download_or_load_dataset(dataset_name: str, return_train=True):
+def download_or_load_dataset(dataset_name: str, only_test_images=False):
     '''
     Downloads the dataset, or loads it if already exist locally
     :param dataset_name: str containing the name of the dataset
@@ -527,6 +527,7 @@ def download_or_load_dataset(dataset_name: str, return_train=True):
     '''
     print('Only SVHN_Cropped is downloaded directly to the datasets folder, the other datasets are stored'
           'locally in ~/.keras/datasets')
+    train_images, train_labels, class_names = None, None, None
     if dataset_name == 'MNIST':
         # Load the dataset
         (train_images, train_labels), (test_images, test_labels) = tf.keras.datasets.mnist.load_data()
@@ -588,14 +589,40 @@ def download_or_load_dataset(dataset_name: str, return_train=True):
         # Definition of the constants of the dataset
         class_names = list(np.linspace(0, 9, 10).astype('int'))
         class_names = [str(i) for i in class_names]
+    elif dataset_name == 'MNIST_color':
+        (_, _), (test_images, test_labels) = tf.keras.datasets.mnist.load_data()
+        test_images = test_images / 255
+        test_images = test_images.reshape(10000, 28, 28, 1)
+        test_images = test_images.astype('float32')
+        test_images = np.tile(test_images, 3)
+        test_images = resize(test_images, (10000, 32, 32, 3))
+    elif dataset_name == 'Fashion_MNIST_color':
+        (_, _), (test_images, test_labels) = tf.keras.datasets.fashion_mnist.load_data()
+        test_images = test_images / 255
+        test_images = test_images.reshape(10000, 28, 28, 1)
+        test_images = test_images.astype('float32')
+        test_images = np.tile(test_images, 3)
+        test_images = resize(test_images, (10000, 32, 32, 3))
+    elif dataset_name == 'Cifar10_gray':
+        cifar = tf.keras.datasets.cifar10
+        (_, _), (test_images, test_labels) = cifar.load_data()
+        # Damos el formato correspondiente a las imagenes
+        test_images = test_images.reshape(10000, 32, 32, 3)
+        test_images = test_images.astype('float32') / 255
+        test_images = np.expand_dims(color.rgb2gray(test_images), axis=3)
+        test_images = resize(test_images, (10000, 28, 28, 1))
     else:
         raise NameError('Dataset name not found in the dataset options')
-
-    if return_train is True:
-        num_classes = len(class_names)
-        return (train_images, train_labels), (test_images, test_labels), class_names, num_classes
-    elif return_train is False:
-        return test_images, test_labels
+    if only_test_images is False:
+        if (train_images, train_labels, class_names) is (None, None, None):
+            raise Exception(f'Incompatible choices {dataset_name} with "only_test_images=False". If you want to use'
+                            f' this dataset to train a model, please, include the train_images, train_labels and'
+                            f'class_names attributes in the definition of the dataset in the function'
+                            f'download_or_load_dataset in utils.py')
+        else:
+            return (train_images, train_labels), (test_images, test_labels), class_names
+    elif only_test_images is True:
+        return test_images
     else:
         raise NameError('Wrong option for the return_train parameter')
 
