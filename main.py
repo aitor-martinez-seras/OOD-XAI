@@ -24,7 +24,6 @@ import os
 import pickle
 from zipfile import ZipFile
 # Scipy functions
-from scipy.optimize import minimize_scalar
 from scipy.io import loadmat
 from scipy.cluster.hierarchy import dendrogram
 # Import created functions
@@ -34,6 +33,7 @@ from train_detector import train_od_detector
 from constants import *
 from test_detector import test_od_detector, create_or_load_average_heatmaps
 from plots import plot_average_heatmaps
+from time import sleep
 
 
 def transform_to_MNIST_format():
@@ -91,8 +91,8 @@ def main():
             'ood': ['MNIST'],
             'model_arch': ['LeNet'],
             'load_or_train': 'Load',
-            'average_mode': 'Mean',
-            'comparison_function': 'g_r',
+            'average_mode': ['Mean'],
+            'comparison_function': ['g_r'],
             'seed': 8,
             'n_heatmaps': 1000
             }
@@ -159,6 +159,7 @@ def main():
                               )
 
             # Generate test heatmaps of the in_dataset
+            test_predictions = np.argmax(model.predict(test_images), axis=1)
             file_name_heatmaps_test = f'heatmaps_ood_{in_dataset}_{model_arch}' \
                                       f'_{args["load_or_train"]}_seed{args["seed"]}.npy'
             path_heatmaps_test = os.path.join(OBJECTS_DIR_NAME, file_name_heatmaps_test)
@@ -167,7 +168,6 @@ def main():
                 print(f'Test heatmaps of {in_dataset} exist, they have been loaded from file!')
             else:
                 print('Heatmap generation:')
-                test_predictions = np.argmax(model.predict(test_images), axis=1)
                 test_heatmaps = generate_heatmaps(test_images, test_predictions, model)
                 np.save(path_heatmaps_test, test_heatmaps, allow_pickle=False)
 
@@ -189,6 +189,8 @@ def main():
                     continue
 
                 # Generate the OoD heatmaps of the ood_dataset
+                ood_images = download_or_load_dataset(ood_dataset, only_test_images=True)
+                ood_predictions = np.argmax(model.predict(ood_images), axis=1)
                 file_name_heatmaps_ood = f'heatmaps_ood_{ood_dataset}_{model_arch}' \
                                          f'_{args["load_or_train"]}_seed{args["seed"]}.npy'
                 path_heatmaps_ood = os.path.join(OBJECTS_DIR_NAME, file_name_heatmaps_ood)
@@ -197,8 +199,6 @@ def main():
                     print(f'OoD heatmaps of {ood_dataset} exist, they have been loaded from file!')
                 else:
                     print('Heatmap generation:')
-                    ood_images = download_or_load_dataset(ood_dataset, only_test_images=True)
-                    ood_predictions = np.argmax(model.predict(ood_images), axis=1)
                     ood_heatmaps = generate_heatmaps(ood_images, ood_predictions, model)
                     np.save(path_heatmaps_ood, ood_heatmaps, allow_pickle=False)
 
@@ -220,7 +220,7 @@ def main():
                         model_arch,
                         args,
                         average_mode
-                    )
+                        )
 
                     # Create the plot for the average heatmaps
                     plot_average_heatmaps(average_heatmaps_per_class_and_cluster, class_names, fig_name,
@@ -229,18 +229,30 @@ def main():
                         if isinstance(average_mode, float) and comp_funct == 'g_all':
                             pass
                         else:
-                            test_od_detector(in_dataset,
+                            test_od_detector(average_heatmaps_per_class_and_cluster,
+                                             in_dataset,
                                              ood_dataset,
                                              test_heatmaps,
+                                             test_predictions,
                                              ood_heatmaps,
+                                             ood_predictions,
                                              model,
                                              model_arch,
                                              average_mode,
                                              comp_funct,
+                                             class_names,
+                                             args
                                              )
+    print('')
+    print('-'*75)
+    print('')
+    print('Program finished, all the tests where computed successfully!')
+    print("Thanks for using the code, if there is any doubt don't hesitate contacting the owner of the repository")
+    print('')
+    print('-'*75)
+    sleep(3)
 
 
 if __name__ == '__main__':
-    # Data range constant for SSIM defined in the utils.py
     # Run main code
     main()

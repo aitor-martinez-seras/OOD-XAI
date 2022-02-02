@@ -6,6 +6,7 @@ resnet32/
 pretrained_weights/
 figures/
 objects/
+results/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
