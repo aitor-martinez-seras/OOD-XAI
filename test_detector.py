@@ -2,7 +2,6 @@
 import os
 import pickle
 import warnings
-
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
@@ -149,6 +148,7 @@ def compute_and_save_results(ssim_per_image_test: np.ndarray, test_predictions: 
         if not repeated:
             df.loc[len(df)] = new_result
             # Print info
+            print('')
             print('| ---------------------------------- |')
             print('| -------- New result saved -------- |')
             print('| ---------------------------------- |')
@@ -186,7 +186,7 @@ def create_or_load_average_heatmaps(in_dataset: str, model_arch: str, args: dict
     # Different name depending on the average mode
     if isinstance(average_mode, float):
         percentage_threshold = average_mode
-        average_mode = 'Percentage'
+        average_mode = 'Mean'
         file_name_average_heatmaps = f'average_heatmaps_per_class_and_cluster_{in_dataset}_{model_arch}' \
                                      f'_{args["load_or_train"]}_seed{args["seed"]}_percent{average_mode}.pkl'
     else:

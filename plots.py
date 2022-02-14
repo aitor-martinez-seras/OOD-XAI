@@ -80,6 +80,7 @@ def plot_average_heatmaps(average_heatmaps_per_class_and_cluster, class_names: l
     cbar.ax.tick_params(labelsize=12 + max_cols * 4)
     path_plot = os.path.join(FIGURES_DIR_NAME, fig_name)
     plt.savefig(path_plot, bbox_inches='tight')
+    plt.close()
 
 
 def plot_histograms_per_class_test_vs_ood(ssim_per_image_test, test_predictions, ssim_per_image_od, ood_predictions,
@@ -187,6 +188,7 @@ def plot_histograms_per_class_test_vs_ood(ssim_per_image_test, test_predictions,
         ax[i, j].legend(fontsize=14, loc='upper right')
     fig_path = os.path.join(FIGURES_DIR_NAME, fig_name)
     fig.savefig(fig_path, bbox_inches='tight')
+    plt.close()
 
 
 def plot_AUROC(auroc_value, tpr_values_auroc, fpr_values_auroc, fpr_95, fpr_80, fig_name):
@@ -207,6 +209,7 @@ def plot_AUROC(auroc_value, tpr_values_auroc, fpr_values_auroc, fpr_95, fpr_80, 
     plt.legend(fontsize=20, loc='upper left')
     fig_path = os.path.join(FIGURES_DIR_NAME, fig_name)
     plt.savefig(fig_path)
+    plt.close()
 
 
 def plot_AUPR(aupr_value, tpr_values, precision, fig_name):
@@ -223,6 +226,7 @@ def plot_AUPR(aupr_value, tpr_values, precision, fig_name):
     plt.legend(fontsize=20, loc='upper left')
     fig_path = os.path.join(FIGURES_DIR_NAME, fig_name)
     plt.savefig(fig_path)
+    plt.close()
 
 
 

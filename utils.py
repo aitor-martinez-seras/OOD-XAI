@@ -250,10 +250,12 @@ def compute_average_heatmaps_per_cluster(cluster_indexes, heatmaps_array, ssim_d
         indexes_one_cluster = np.asarray(np.asarray(cluster_indexes == cluster).nonzero()[0])
         # Either retrieve only the closest heatmaps of that cluster OR retrieve all
         if thr is not None and len(indexes_one_cluster) > 39:  # Retrieval of only the closest ones
-            # Initialize the array that will contain the mean D_ssim of each heatmap against the heatmaps of the cluster including itself
+            # Initialize the array that will contain the mean D_ssim of each heatmap against the heatmaps of the
+            # cluster including itself
             mean_dist_ssim_of_htmaps_of_cluster = np.zeros((len(indexes_one_cluster)))
             for loop_index_1, index_htmap_1 in enumerate(indexes_one_cluster):
-                # Initialize the array that will be used to collect the ssim values against the others to then compute the mean
+                # Initialize the array that will be used to collect the ssim values against the others
+                # to then compute the mean
                 dist_ssim_of_one_htmap_against_all = np.zeros((len(indexes_one_cluster)))
                 for loop_index_2, index_htmap_2 in enumerate(indexes_one_cluster):
                     dist_ssim_of_one_htmap_against_all[loop_index_2] = ssim_distance_matrix_one_class[
@@ -591,24 +593,23 @@ def download_or_load_dataset(dataset_name: str, only_test_images=False):
         # Definition of the constants of the dataset
         class_names = list(np.linspace(0, 9, 10).astype('int'))
         class_names = [str(i) for i in class_names]
-    elif dataset_name == 'MNIST_color':
+    elif dataset_name == 'MNIST_Color':
         (_, _), (test_images, test_labels) = tf.keras.datasets.mnist.load_data()
         test_images = test_images / 255
         test_images = test_images.reshape(10000, 28, 28, 1)
         test_images = test_images.astype('float32')
         test_images = np.tile(test_images, 3)
         test_images = resize(test_images, (10000, 32, 32, 3))
-    elif dataset_name == 'Fashion_MNIST_color':
+    elif dataset_name == 'Fashion_MNIST_Color':
         (_, _), (test_images, test_labels) = tf.keras.datasets.fashion_mnist.load_data()
         test_images = test_images / 255
         test_images = test_images.reshape(10000, 28, 28, 1)
         test_images = test_images.astype('float32')
         test_images = np.tile(test_images, 3)
         test_images = resize(test_images, (10000, 32, 32, 3))
-    elif dataset_name == 'Cifar10_gray':
+    elif dataset_name == 'Cifar10_Gray':
         cifar = tf.keras.datasets.cifar10
         (_, _), (test_images, test_labels) = cifar.load_data()
-        # Damos el formato correspondiente a las imagenes
         test_images = test_images.reshape(10000, 32, 32, 3)
         test_images = test_images.astype('float32') / 255
         test_images = np.expand_dims(color.rgb2gray(test_images), axis=3)

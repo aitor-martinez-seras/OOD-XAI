@@ -3,6 +3,13 @@
   <component name="CsvFileAttributes">
     <option name="attributeMap">
       <map>
+        <entry key="\results\results_Fashion_MNIST_vs_Cifar10_Gray_LeNet_Load_seed8.csv">
+          <value>
+            <Attribute>
+              <option name="separator" value=";" />
+            </Attribute>
+          </value>
+        </entry>
         <entry key="\results\results_Fashion_MNIST_vs_MNIST_LeNet_Load_seed8.csv">
           <value>
             <Attribute>
