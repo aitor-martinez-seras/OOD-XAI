@@ -5,13 +5,13 @@ import pandas as pd
 #import plotly.express as px
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import rc, rcParams
-from constants import FIGURES_DIR_NAME
+from matplotlib import rcParams
+from utils.constants import FIGURES_DIR_NAME
 
 
 plt.rcParams.update({
     "text.usetex": True,
-    "font.family": "sans-serif",
+    "font.family": "sans",
     "font.sans-serif": ["Helvetica"]})
 rcParams['text.latex.preamble'] = [r'\usepackage{amsmath}']
 

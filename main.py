@@ -3,27 +3,13 @@
 import warnings
 import argparse
 # Import created functions
-from utils import *
-from models import create_model
-from train_detector import train_od_detector
-from constants import *
-from test_detector import test_od_detector, create_or_load_average_heatmaps
-from plots import plot_average_heatmaps
+from utils.utils import *
+from utils.models import create_model
+from utils.train_detector import train_od_detector
+from utils.constants import *
+from utils.test_detector import test_od_detector, create_or_load_average_heatmaps
+from utils.plots import plot_average_heatmaps
 from time import sleep
-
-
-def transform_to_MNIST_format():
-    '''
-    Transforms a given dataset to MNIST format (28x28x1)
-    :return:
-    '''
-
-
-def transform_to_Cifar10_like():
-    '''
-    Transforms a given gray dataset to Cifar10 format (32x32x3)
-    :return:
-    '''
 
 
 def check_arguments(args):
@@ -34,8 +20,8 @@ def check_arguments(args):
             'ood': ['MNIST', 'Fashion_MNIST', 'Cifar10', 'SVHN_Cropped'],
             'model_arch': ['LeNet', 'ResNet32'],
             'load_or_train': 'Load',
-            'average_mode': ['Mean', 'Median', 10],
-            'comparison_function': ['g_r', 'g_all'],
+            'agg_function': ['Mean', 'Median', 10],
+            'ood_function': ['f_1', 'f_2'],
             'seed': 8,
             'n_heatmaps': 1000
         }
@@ -50,24 +36,24 @@ def check_arguments(args):
                 raise KeyError(str(keys_missing))
 
         # If all parameters have been introduced, we must check if they are all correct
-        # 1: Average mode assertion
-        for index, avg_mode in enumerate(args['average_mode']):
+        # 1: Aggregation function assertion
+        for index, f_agg in enumerate(args['agg_function']):
             try:
-                avg_mode = int(avg_mode)
-                args['average_mode'][index] = avg_mode
+                f_agg = int(f_agg)
+                args['agg_function'][index] = f_agg
             except ValueError:
                 pass  # If the argument is not convertible, it is a normal string
-            if isinstance(avg_mode, str):
-                if avg_mode not in ["Mean", "Median"]:
+            if isinstance(f_agg, str):
+                if f_agg not in ["Mean", "Median"]:
                     raise ValueError(
                         'The average mode must be either "Mean", "Median" or a positive integer between '
                         '10 and 100')
-            elif isinstance(avg_mode, int):
-                if not 10 <= avg_mode <= 100:
+            elif isinstance(f_agg, int):
+                if not 10 <= f_agg <= 100:
                     raise ValueError(
                         'The average mode must be either "Mean", "Median" or a positive integer between '
                         '10 and 100')
-                elif 70 <= avg_mode:
+                elif 70 <= f_agg:
                     warnings.warn(
                         'The percentage selected is above 70, take into account that this will give results '
                         'similar to the "Mean" average mode')
@@ -85,6 +71,7 @@ def check_arguments(args):
 
     return args
 
+
 def main():
     # Parse the arguments of the call
     parser = argparse.ArgumentParser(description='Script that trains the detector on a specific ')
@@ -94,9 +81,9 @@ def main():
     parser.add_argument('-m', '--model_arch', type=str, choices=['LeNet', 'ResNet32'], nargs='+',
                         help='model architecture, only one a each call')
     parser.add_argument('-load_or_train', type=str, choices=['Load', 'Train'], help='model architecture')
-    parser.add_argument('-avg', '--average_mode', nargs='+', help='average modes to be computed: '
+    parser.add_argument('-f_agg', '--agg_function', nargs='+', help='average modes to be computed: '
                         'Possible choices are Mean, Median or an integer representing the percentage')
-    parser.add_argument('-comp_f', '--comparison_function', type=str, choices=['g_r', 'g_all'], nargs='+',
+    parser.add_argument('-f_ood', '--ood_function', type=str, choices=['f_1', 'f_2'], nargs='+',
                         help='comparison functions to be computed')
     parser.add_argument('-s', '--seed', type=int, help='Seed for shuffling the train images and labels', default=8)
     parser.add_argument('-n_heatmaps', type=int, help='Select the number of heatmaps per class for the clustering',
@@ -246,18 +233,18 @@ def main():
                     np.save(path_heatmaps_ood, ood_heatmaps, allow_pickle=False)
 
                 # Compute all the approaches for every combination of in and out distribution dataset
-                for average_mode in args['average_mode']:
+                for agg_function in args['agg_function']:
                     print('-' * 50)
-                    print(f'------ The average mode being used is {average_mode}')
+                    print(f'------ The average mode being used is {agg_function}')
                     print('-' * 50)
 
-                    # If the average_mode is a percentage, we must convert it to it
-                    if isinstance(average_mode, int):
-                        fig_name = f'percent{average_mode}_average_heatmaps_per_class_and_cluster_{in_dataset}' \
+                    # If the agg_function is a percentage, we must convert it to it
+                    if isinstance(agg_function, int):
+                        fig_name = f'percent{agg_function}_average_heatmaps_per_class_and_cluster_{in_dataset}' \
                                    f'_{model_arch}_{args["load_or_train"]}_seed{args["seed"]}'
-                        average_mode = average_mode * 0.01
+                        agg_function = agg_function * 0.01
                     else:
-                        fig_name = f'{average_mode}_average_heatmaps_per_class_and_cluster_{in_dataset}' \
+                        fig_name = f'{agg_function}_average_heatmaps_per_class_and_cluster_{in_dataset}' \
                                    f'_{model_arch}_{args["load_or_train"]}_seed{args["seed"]}'
 
                     # Compute or load the average
@@ -265,17 +252,17 @@ def main():
                         in_dataset,
                         model_arch,
                         args,
-                        average_mode
+                        agg_function
                         )
 
                     # Create the plot for the average heatmaps
                     plot_average_heatmaps(average_heatmaps_per_class_and_cluster, class_names, fig_name,
                                           superimposed=False)
-                    for comp_funct in args['comparison_function']:
+                    for f_ood in args['ood_function']:
                         print('-' * 50)
-                        print(f'-------- The comparison function is {comp_funct}')
+                        print(f'-------- The comparison function is {f_ood}')
                         print('-' * 50)
-                        if isinstance(average_mode, float) and comp_funct == 'g_all':
+                        if isinstance(agg_function, float) and f_ood == 'f_2':
                             pass
                         else:
                             test_od_detector(average_heatmaps_per_class_and_cluster,
@@ -287,8 +274,8 @@ def main():
                                              ood_predictions,
                                              model,
                                              model_arch,
-                                             average_mode,
-                                             comp_funct,
+                                             agg_function,
+                                             f_ood,
                                              class_names,
                                              args
                                              )
@@ -300,7 +287,7 @@ def main():
     sleep(2)
     print('')
     sleep(0.5)
-    print("Thanks for using the code, if there is any doubt don't hesitate contacting the owner of the repository")
+    print("Thanks for using the utils, if there is any doubt don't hesitate contacting the owner of the repository")
     print('')
     sleep(1)
     print('-'*102)
@@ -308,5 +295,5 @@ def main():
 
 
 if __name__ == '__main__':
-    # Run main code
+    # Run main utils
     main()

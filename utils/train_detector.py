@@ -4,8 +4,8 @@ from sklearn.utils import shuffle
 from sklearn.metrics import silhouette_score
 from sklearn.cluster import AgglomerativeClustering
 # Import created functions
-from utils import *
-from constants import *
+from utils.utils import *
+from utils.constants import *
 
 
 def train_od_detector(in_dataset: str, args: dict, train_images_and_labels: tuple, model: keras.Model, model_arch: str,

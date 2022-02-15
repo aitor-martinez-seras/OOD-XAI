@@ -1,5 +1,5 @@
 import os
-from utils import download_file_from_google_drive, unzip_file
+from utils.utils import download_file_from_google_drive, unzip_file
 from tensorflow import keras
 from tensorflow.keras.optimizers import Adam
 
@@ -33,7 +33,7 @@ def create_model(model_name):
         subprocess.check_call([sys.executable, "-m", "pip", "install", 'download'])
         RESNET32_ID = '1lb1V6KmZzhLevtybnVNd0G_5OrKYoiNK'
         RESNET32_ZIP_FILE = 'resnet32.zip'
-        RESNET32_DIR = 'resnet32/'
+        RESNET32_DIR = '../resnet32/'
         resnet32_zip_path = os.path.join(RESNET32_DIR, RESNET32_ZIP_FILE)
         if os.path.isdir(RESNET32_DIR):
             print(f'"{RESNET32_DIR}" directory already exist, delete if to automatically download again the files')

@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
 import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras.utils import to_categorical
@@ -20,7 +19,7 @@ from zipfile import ZipFile
 from scipy.io import loadmat
 from scipy.cluster.hierarchy import dendrogram
 # Constants
-from constants import *
+from utils.constants import *
 
 
 def create_dir(dir_name):
@@ -225,13 +224,13 @@ def creation_of_heatmaps_per_class(number_of_htmaps, instances, labels, model, c
     return heatmaps
 
 
-def compute_average_heatmaps_per_cluster(cluster_indexes, heatmaps_array, ssim_distance_matrix_one_class, avg_mode,
+def compute_average_heatmaps_per_cluster(cluster_indexes, heatmaps_array, ssim_distance_matrix_one_class, f_agg,
                                          thr=None):
     '''
     Computes the average per cluster of the provided heatmaps
     ::cluster_indexes: array with the cluster indexes
     ::heatmaps_array: array with the heatmaps. Shape = [number_of_htmaps, height, width]
-    ::avg_mode: string that defines how to do the average
+    ::f_agg: string that defines how to do the average
     ::thr: if we want to compute the average only on a percentage of the closest ones
             the threshold parameter should be included with the percentage in the range
             of 0 to 1.
@@ -244,7 +243,7 @@ def compute_average_heatmaps_per_cluster(cluster_indexes, heatmaps_array, ssim_d
         unique = np.delete(unique, 0)
         counts = np.delete(counts, 0)
     # Initialize the array where the average heatmaps are going to be stored
-    avg_htmaps_per_cluster = np.empty((len(unique), heatmaps_array.shape[1], heatmaps_array.shape[2]))
+    agg_htmaps_per_cluster = np.empty((len(unique), heatmaps_array.shape[1], heatmaps_array.shape[2]))
     for index_unique, cluster in enumerate(unique):
         # Retrieve the indexes of the cluster
         indexes_one_cluster = np.asarray(np.asarray(cluster_indexes == cluster).nonzero()[0])
@@ -273,18 +272,18 @@ def compute_average_heatmaps_per_cluster(cluster_indexes, heatmaps_array, ssim_d
             htmaps_of_the_cluster = heatmaps_array[indexes_one_cluster]
 
         # Compute the average depending on the mode selected
-        if avg_mode == 'Mean':
+        if f_agg == 'Mean':
             # print(htmaps_of_the_cluster.shape)
             htmap_prom_un_cluster = np.mean(htmaps_of_the_cluster, axis=0)
 
-        elif avg_mode == 'Median':
+        elif f_agg == 'Median':
             htmap_prom_un_cluster = np.median(htmaps_of_the_cluster, axis=0)
         else:
             raise NameError('Non-existant mode introduced')
         # For every cluster we add its average heatmap
-        avg_htmaps_per_cluster[index_unique] = htmap_prom_un_cluster
+        agg_htmaps_per_cluster[index_unique] = htmap_prom_un_cluster
 
-    return avg_htmaps_per_cluster
+    return agg_htmaps_per_cluster
 
 
 def extract_last_convolutional_layer_name(model) -> str:
@@ -336,7 +335,7 @@ def ssim_distance(img1, img2):
     return (1 - ssim(img1, img2, data_range=DATA_RANGE)) / 2
 
 
-def compute_ssim_against_cluster_averages(input_heatmaps, preds, avg_htmaps_per_class_and_cluster, mode='Similarity'):
+def compute_ssim_against_cluster_averages(input_heatmaps, preds, agg_htmaps_per_class_and_cluster, mode='Similarity'):
     '''
       Computes the ssim of the input heatmaps against the cluster averages of the predicted class
       '''
@@ -344,22 +343,22 @@ def compute_ssim_against_cluster_averages(input_heatmaps, preds, avg_htmaps_per_
     ssim_per_input_heatmap = np.zeros((len(input_heatmaps)))
     for index, predicted_class in tqdm(enumerate(preds)):
         # Initialize the array containing the SSIM values against cluster averages for one input heatmap
-        ssim_against_cluster_avgs = np.zeros((avg_htmaps_per_class_and_cluster[predicted_class].shape[0]))
+        ssim_against_cluster_agg = np.zeros((agg_htmaps_per_class_and_cluster[predicted_class].shape[0]))
         if mode == 'Similarity':
-            for index_avg_htmap, avg_htmap in enumerate(avg_htmaps_per_class_and_cluster[predicted_class]):
-                ssim_against_cluster_avgs[index_avg_htmap] = ssim(avg_htmap, input_heatmaps[index],
+            for index_agg_htmap, agg_htmap in enumerate(agg_htmaps_per_class_and_cluster[predicted_class]):
+                ssim_against_cluster_agg[index_agg_htmap] = ssim(agg_htmap, input_heatmaps[index],
                                                                   data_range=DATA_RANGE)
         elif mode == 'Distance':
-            for index_avg_htmap, avg_htmap in enumerate(avg_htmaps_per_class_and_cluster[predicted_class]):
-                ssim_against_cluster_avgs[index_avg_htmap] = ssim_distance(avg_htmap, input_heatmaps[index])
+            for index_agg_htmap, agg_htmap in enumerate(agg_htmaps_per_class_and_cluster[predicted_class]):
+                ssim_against_cluster_agg[index_agg_htmap] = ssim_distance(agg_htmap, input_heatmaps[index])
         else:
             raise NameError('Selected mode does not exist')
         # Select the more similar average heatmap (the max SSIM value)
-        ssim_per_input_heatmap[index] = np.max(ssim_against_cluster_avgs)
+        ssim_per_input_heatmap[index] = np.max(ssim_against_cluster_agg)
     return ssim_per_input_heatmap
 
 
-def compute_ssim_against_all_heatmaps_of_closest_cluster(input_heatmaps, preds, avg_htmaps_per_class_and_cluster,
+def compute_ssim_against_all_heatmaps_of_closest_cluster(input_heatmaps, preds, agg_htmaps_per_class_and_cluster,
                                                         heatmaps_in_the_clusters_per_class,
                                                         cluster_indexes_of_heatmaps):
     '''
@@ -371,11 +370,11 @@ def compute_ssim_against_all_heatmaps_of_closest_cluster(input_heatmaps, preds, 
     ssim_per_input_heatmap = np.zeros((len(input_heatmaps)))
     for index, predicted_class in tqdm(enumerate(preds)):
         # Initialize the array that will contain the SSIM values to the cluster averages.
-        ssim_against_cluster_avgs = np.zeros((len(avg_htmaps_per_class_and_cluster[predicted_class])))
-        for index_avg_htmap, avg_htmap in enumerate(avg_htmaps_per_class_and_cluster[predicted_class]):
+        ssim_against_cluster_agg = np.zeros((len(agg_htmaps_per_class_and_cluster[predicted_class])))
+        for index_agg_htmap, agg_htmap in enumerate(agg_htmaps_per_class_and_cluster[predicted_class]):
             # Compute distances and we select the closest cluster
-            ssim_against_cluster_avgs[index_avg_htmap] = ssim(input_heatmaps[index], avg_htmap, data_range=DATA_RANGE)
-            closest_cluster_index = np.argmax(ssim_against_cluster_avgs)  # Max similarity == Closest cluster
+            ssim_against_cluster_agg[index_agg_htmap] = ssim(input_heatmaps[index], agg_htmap, data_range=DATA_RANGE)
+            closest_cluster_index = np.argmax(ssim_against_cluster_agg)  # Max similarity == Closest cluster
         # Indexes of the heatmaps that belong to the nearest cluster.
         indexes_of_closest_cluster_heatmaps = np.asarray(
             np.asarray(cluster_indexes_of_heatmaps[predicted_class] == closest_cluster_index).nonzero()[0])
@@ -617,7 +616,7 @@ def download_or_load_dataset(dataset_name: str, only_test_images=False):
     else:
         raise NameError('Dataset name not found in the dataset options')
     if only_test_images is False:
-        if (train_images, train_labels, class_names) is (None, None, None):
+        if (train_images, train_labels, class_names) == (None, None, None):
             raise Exception(f'Incompatible choices {dataset_name} with "only_test_images=False". If you want to use'
                             f' this dataset to train a model, please, include the train_images, train_labels and'
                             f'class_names attributes in the definition of the dataset in the function'
@@ -657,58 +656,6 @@ def download_models_weights(weights_dir_path):
             print(f'Successfully downloaded the {weights_dir_path} directory')
     except Exception as e:
         print(f'Exception {e.__class__} occurred while creating downloading')
-
-
-def load_test_sample_of_dataset(dataset_name):
-    # Load the selected dataset
-    if dataset_name == 'SVHN_cropped':
-        # Download SVHN
-        SVHN_FOLDER_PATH = unzip_file(download_SVHN())
-        images, labels = load_svhn(SVHN_FOLDER_PATH, "test_32x32.mat")
-        np.random.shuffle(images)
-        images = images[:10000]
-    elif dataset_name == 'MNIST':
-        (_, _), (images, labels) = tf.keras.datasets.mnist.load_data()
-        images = images / 255
-        images = images.reshape(10000, 28, 28, 1)
-        images = images.astype('float32')
-        labels = to_categorical(labels)
-    elif dataset_name == 'Fashion_MNIST':
-        (_, _), (images, labels) = tf.keras.datasets.fashion_mnist.load_data()
-        images = images / 255
-        images = images.reshape(10000, 28, 28, 1)
-        images = images.astype('float32')
-    elif dataset_name == 'MNIST_color':
-        (_, _), (images, labels) = tf.keras.datasets.mnist.load_data()
-        images = images / 255
-        images = images.reshape(10000, 28, 28, 1)
-        images = images.astype('float32')
-        images = np.tile(images, 3)
-        images = resize(images, (10000, 32, 32, 3))
-    elif dataset_name == 'Fashion_MNIST_color':
-        (_, _), (images, labels) = tf.keras.datasets.fashion_mnist.load_data()
-        images = images / 255
-        images = images.reshape(10000, 28, 28, 1)
-        images = images.astype('float32')
-        images = np.tile(images, 3)
-        images = resize(images, (10000, 32, 32, 3))
-    elif dataset_name == 'Cifar10_grey':
-        cifar = tf.keras.datasets.cifar10
-        (_, _), (images, labels) = cifar.load_data()
-        # Damos el formato correspondiente a las imagenes
-        images = images.reshape(10000, 32, 32, 3)
-        images = images.astype('float32') / 255
-        images = np.expand_dims(color.rgb2gray(images), axis=3)
-        images = resize(images, (10000, 28, 28, 1))
-    elif dataset_name == 'Cifar10':
-        cifar = tf.keras.datasets.cifar10
-        (_, _), (images, labels) = cifar.load_data()
-        # Damos el formato correspondiente a las imagenes
-        images = images.reshape(10000, 32, 32, 3)
-        images = images.astype('float32') / 255
-    else:
-        raise NameError()
-    return images, labels
 
 
 # Rotate images (17s 60.000 images)

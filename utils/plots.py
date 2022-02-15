@@ -1,13 +1,13 @@
 import os.path
-
 import matplotlib.pyplot as plt
 import numpy as np
-from skimage.transform import resize
-from skimage.transform import rotate
-from constants import *
-from utils import search_index_of_class, cdf_difference
 from scipy import stats
 from scipy.optimize import minimize_scalar
+from skimage.transform import resize
+from skimage.transform import rotate
+from utils.constants import *
+from utils.utils import search_index_of_class, cdf_difference
+
 
 
 def plot_average_heatmaps(average_heatmaps_per_class_and_cluster, class_names: list, fig_name: str, superimposed=False,

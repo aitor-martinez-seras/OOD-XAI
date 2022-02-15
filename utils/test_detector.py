@@ -5,17 +5,17 @@ import warnings
 import pandas as pd
 from tqdm import tqdm
 import numpy as np
-from constants import *
-from utils import create_dir, compute_average_heatmaps_per_cluster, \
+from utils.constants import *
+from utils.utils import create_dir, compute_average_heatmaps_per_cluster, \
     compute_ssim_against_cluster_averages, compute_ssim_against_all_heatmaps_of_closest_cluster, \
     similarity_thresholds_for_each_TPR, compute_precision_tpr_fpr_for_test_and_OoD_similarity
-from plots import plot_histograms_per_class_test_vs_ood, plot_AUROC, plot_AUPR
+from utils.plots import plot_histograms_per_class_test_vs_ood, plot_AUROC, plot_AUPR
 
 
 def test_od_detector(average_heatmaps_per_class_and_cluster, in_dataset: str, ood_dataset: str,
                      test_heatmaps: np.ndarray, test_predictions: np.ndarray,
                      ood_heatmaps: np.ndarray, ood_predictions: np.ndarray, model, model_arch: str,
-                     average_mode: str or int, comp_funct: str, class_names: list, args: dict):
+                     agg_function: str or int, f_ood: str, class_names: list, args: dict):
 
     # Load the heatmaps train and the clustering labels
     file_name_heatmaps_train_per_class = f'heatmaps_train_per_class_{in_dataset}_{model_arch}' \
@@ -28,16 +28,16 @@ def test_od_detector(average_heatmaps_per_class_and_cluster, in_dataset: str, oo
     clustering_labels_per_class = np.load(path_clustering)
 
     # Depending on the function, execute different functions
-    if comp_funct == 'g_r':
+    if f_ood == 'f_1':
         ssim_per_image_test = compute_ssim_against_cluster_averages(test_heatmaps, test_predictions,
                                                                     average_heatmaps_per_class_and_cluster)
         ssim_per_image_ood = compute_ssim_against_cluster_averages(ood_heatmaps, ood_predictions,
                                                                   average_heatmaps_per_class_and_cluster)
 
-    elif comp_funct == 'g_all':
+    elif f_ood == 'f_2':
         # Test (Compare the test_images of the in-dataset against the clusters)
         file_name_comparison_approach_test = f'ssim_all_heatmaps_of_closest_cluster_{in_dataset}_vs_{in_dataset}' \
-                                             f'_{model_arch}_{average_mode}.npy'
+                                             f'_{model_arch}_{agg_function}.npy'
         path_comparison_approach_test = os.path.join(OBJECTS_DIR_NAME, file_name_comparison_approach_test)
         if os.path.isfile(path_comparison_approach_test):
             print(f'SSIM values of {in_dataset}_vs_{in_dataset}_{model_arch} exist, they will be loaded')
@@ -54,7 +54,7 @@ def test_od_detector(average_heatmaps_per_class_and_cluster, in_dataset: str, oo
             np.save(path_comparison_approach_test, ssim_per_image_test, allow_pickle=False)
         # OOD
         file_name_comparison_approach_od = f'ssim_all_heatmaps_of_closest_cluster_{in_dataset}_vs_{ood_dataset}' \
-                                           f'_{model_arch}_{average_mode}.npy'
+                                           f'_{model_arch}_{agg_function}.npy'
         path_comparison_approach_od = os.path.join(OBJECTS_DIR_NAME, file_name_comparison_approach_od)
         if os.path.isfile(path_comparison_approach_od):
             print(f'SSIM values of {ood_dataset}_{model_arch} exist, they will be loaded')
@@ -71,10 +71,10 @@ def test_od_detector(average_heatmaps_per_class_and_cluster, in_dataset: str, oo
             np.save(path_comparison_approach_od, ssim_per_image_ood, allow_pickle=False)
 
     else:
-        raise NameError(f'{comp_funct} comparison function does not exist.')
+        raise NameError(f'{f_ood} comparison function does not exist.')
 
     # Create the figure with histograms per class
-    fig_name = f'Histograms_{in_dataset}_vs_{ood_dataset}_{average_mode}_{comp_funct}_{model_arch}_' \
+    fig_name = f'Histograms_{in_dataset}_vs_{ood_dataset}_{agg_function}_{f_ood}_{model_arch}_' \
                f'{args["load_or_train"]}_seed{args["seed"]}.pdf'
     plot_histograms_per_class_test_vs_ood(ssim_per_image_test, test_predictions,
                                           ssim_per_image_ood, ood_predictions,
@@ -83,13 +83,13 @@ def test_od_detector(average_heatmaps_per_class_and_cluster, in_dataset: str, oo
     # Compute and save the AUROC and the AUPR
     compute_and_save_results(ssim_per_image_test, test_predictions,
                              ssim_per_image_ood, ood_predictions,
-                             in_dataset, ood_dataset, average_mode, comp_funct,
+                             in_dataset, ood_dataset, agg_function, f_ood,
                              model_arch, class_names, args)
 
 
 def compute_and_save_results(ssim_per_image_test: np.ndarray, test_predictions: np.ndarray,
                              ssim_per_image_ood: np.ndarray, ood_predictions: np.ndarray,
-                             in_dataset: str, ood_dataset: str, average_mode: str, comparison_function: str,
+                             in_dataset: str, ood_dataset: str, agg_function: str, comparison_function: str,
                              model_arch: str, class_names: list, args: dict):
     # Create results directory in case it does not exist
     create_dir(RESULTS_DIR_NAME)
@@ -140,7 +140,7 @@ def compute_and_save_results(ssim_per_image_test: np.ndarray, test_predictions: 
         df = pd.read_csv(results_file_path, sep=CSV_SEPARATOR, decimal=CSV_DECIMAL)
         # Check if the info to be added is already repeated
         repeated = False
-        new_result = [in_dataset, ood_dataset, average_mode, comparison_function, auroc, aupr, fpr_95, fpr_80]
+        new_result = [in_dataset, ood_dataset, agg_function, comparison_function, auroc, aupr, fpr_95, fpr_80]
         for index, row in df.iterrows():
             if (df == new_result).all(1).any():
                 repeated = True
@@ -156,7 +156,7 @@ def compute_and_save_results(ssim_per_image_test: np.ndarray, test_predictions: 
             warnings.warn("Tested setting was already in the .csv, it will not be added again")
     else:
         df = pd.DataFrame(
-            data=[[in_dataset, ood_dataset, average_mode, comparison_function, auroc, aupr, fpr_95, fpr_80]],
+            data=[[in_dataset, ood_dataset, agg_function, comparison_function, auroc, aupr, fpr_95, fpr_80]],
             columns=CSV_COLUMNS
         )
     # Save or overwrite the .csv file
@@ -173,7 +173,7 @@ def compute_and_save_results(ssim_per_image_test: np.ndarray, test_predictions: 
     }
 
     # Create the figures
-    fig_name = f'{in_dataset}_vs_{ood_dataset}_{model_arch}_{average_mode}_{comparison_function}_' \
+    fig_name = f'{in_dataset}_vs_{ood_dataset}_{model_arch}_{agg_function}_{comparison_function}_' \
                f'{args["load_or_train"]}_seed{args["seed"]}.pdf'
     auroc_fig_name = 'AUROC_' + fig_name
     aupr_fig_name = 'AUPR_' + fig_name
@@ -181,18 +181,18 @@ def compute_and_save_results(ssim_per_image_test: np.ndarray, test_predictions: 
     plot_AUPR(aupr, tpr_values, precision, aupr_fig_name)
 
 
-def create_or_load_average_heatmaps(in_dataset: str, model_arch: str, args: dict, average_mode: str):
+def create_or_load_average_heatmaps(in_dataset: str, model_arch: str, args: dict, agg_function: str):
 
     # Different name depending on the average mode
-    if isinstance(average_mode, float):
-        percentage_threshold = average_mode
-        average_mode = 'Mean'
+    if isinstance(agg_function, float):
+        percentage_threshold = agg_function
+        agg_function = 'Mean'
         file_name_average_heatmaps = f'average_heatmaps_per_class_and_cluster_{in_dataset}_{model_arch}' \
-                                     f'_{args["load_or_train"]}_seed{args["seed"]}_percent{average_mode}.pkl'
+                                     f'_{args["load_or_train"]}_seed{args["seed"]}_percent{agg_function}.pkl'
     else:
         percentage_threshold = None
         file_name_average_heatmaps = f'average_heatmaps_per_class_and_cluster_{in_dataset}_{model_arch}' \
-                                     f'_{args["load_or_train"]}_seed{args["seed"]}_{average_mode}.pkl'
+                                     f'_{args["load_or_train"]}_seed{args["seed"]}_{agg_function}.pkl'
     path_heatmaps_average_heatmaps = os.path.join(OBJECTS_DIR_NAME, file_name_average_heatmaps)
     # Checks if it exists
     if os.path.isfile(path_heatmaps_average_heatmaps):
@@ -225,7 +225,7 @@ def create_or_load_average_heatmaps(in_dataset: str, model_arch: str, args: dict
                 compute_average_heatmaps_per_cluster(clustering_labels_per_class[class_index],
                                                      heatmaps_train_per_class[class_index],
                                                      ssim_distance_matrix_per_class[class_index],
-                                                     avg_mode=average_mode,
+                                                     f_agg=agg_function,
                                                      thr=percentage_threshold))
         with open(path_heatmaps_average_heatmaps, "wb") as f:
             pickle.dump(average_heatmaps_per_class_and_cluster, f)
