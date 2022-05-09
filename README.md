@@ -1,5 +1,5 @@
 # OOD_XAI
-This GihHub repository contains the code of the paper _____.
+This GihHub repository contains the code of the paper _Can Post-hoc Explanations Effectively DetectOut-of-Distribution Samples?_.
 
 ## Requirements
 To install all the libraries needed, use `` pip install -r requirements.txt ``  
